@@ -8,10 +8,154 @@ NotePad 是一个为 Android 平台设计的笔记应用程序，旨在提供一
 编辑笔记：支持对笔记内容和标题的编辑。
 查看笔记：通过笔记列表视图，用户可以浏览所有笔记。
 删除笔记：长按笔记项，选择删除选项，可以移除不需要的笔记。
+搜索笔记：点击搜索菜单，可以根据笔记内容搜索笔记。
+// 找到搜索菜单项并设置其监听器
+MenuItem searchItem = menu.findItem(R.id.menu_search);
+SearchView searchView = (SearchView) searchItem.getActionView();
+searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+@Override
+public boolean onQueryTextSubmit(String query) {
+// 处理搜索提交事件
+return false;
+}
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                // 处理搜索文本变化事件
+                filterNotesList(newText);
+                return false;
+            }
+        });
+private void searchNotes(String query) {
+// 调用 filterNotesList 来实现搜索逻辑
+filterNotesList(query);
+}
+
+    private void filterNotesList(String query) {
+        // 根据查询过滤笔记列表
+        if (mCursor != null) {
+            mCursor.close();
+            mCursor = null;
+        }
+        String selection = NotePad.Notes.COLUMN_NAME_TITLE + " LIKE ? OR " + NotePad.Notes.COLUMN_NAME_NOTE + " LIKE ?";
+        String[] selectionArgs = {"%" + query + "%", "%" + query + "%"};
+        mCursor = getContentResolver().query(NotePad.Notes.CONTENT_URI, PROJECTION, selection, selectionArgs, null);
+        ((SimpleCursorAdapter) getListAdapter()).changeCursor(mCursor);
+    }
+![img.png](img.png)
+![img_1.png](img_1.png)
+![img_2.png](img_2.png)
+![img_3.png](img_3.png)
+
+
+
+
+
+
+每个笔记的创建时间戳：创建笔记后会显示时间戳。
+@Override
+public void bindView(View view, Context context, Cursor cursor) {
+TextView titleView = (TextView) view.findViewById(R.id.note_title);
+TextView timestampView = (TextView) view.findViewById(R.id.note_timestamp);
+if (titleView == null || timestampView == null) {
+Log.e(TAG, "Error: One of the TextViews is null");
+return; // 退出方法，如果任一TextView为null
+}
+
+                String title = cursor.getString(COLUMN_INDEX_TITLE);
+                long timestamp = cursor.getLong(COLUMN_INDEX_MODIFIED);
+                // 确保时间戳是毫秒级单位，如果是秒级单位则不需要乘以1000L
+                String formattedDate = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss",
+                        Locale.getDefault()).format(new Date(timestamp));
+
+                titleView.setText(title);
+                timestampView.setText(formattedDate);
+            }
+        };
+![img_4.png](img_4.png)
+
 
 扩展功能
 笔记排序：用户可以根据笔记的标题或修改日期进行排序。
-护眼模式：开启护眼模式，减少屏幕蓝光，保护视力。
+
+@Override
+public boolean onCreateOptionsMenu(Menu menu) {
+super.onCreateOptionsMenu(menu);
+MenuInflater inflater = getMenuInflater();
+inflater.inflate(R.menu.list_options_menu, menu);
+
+        // 添加排序选项到菜单
+        MenuItem sortItem = menu.findItem(R.id.menu_sort);
+        SubMenu sortSubMenu = sortItem.getSubMenu();
+        sortSubMenu.clear(); // 清除默认子菜单项
+
+        // 添加按标题排序的菜单项
+        sortSubMenu.add(0, R.id.sort_by_title, 0, R.string.sort_by_title)
+                .setIcon(android.R.drawable.ic_menu_sort_by_size)
+                .setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                    @Override
+                    public boolean onMenuItemClick(MenuItem item) {
+                        sortNotesByTitle();
+                        return true;
+                    }
+                });
+
+        sortSubMenu.add(0, R.id.sort_by_date, 0, R.string.sort_by_date)
+                .setIcon(R.drawable.ic_menu_sort_by_date) // 确保你的 drawable 文件存在
+                .setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                    @Override
+                    public boolean onMenuItemClick(MenuItem item) {
+                        sortNotesByDate();
+                        return true;
+                    }
+                });
+private void sortNotesByTitle() {
+// 实现按标题排序的逻辑
+String newSortOrder = NotePad.Notes.COLUMN_NAME_TITLE + " ASC"; // 按标题升序排序
+applySortOrder(newSortOrder);
+}
+
+    private void sortNotesByDate() {
+        // 实现按日期排序的逻辑
+        String newSortOrder = NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " DESC"; // 按修改日期降序排序
+        applySortOrder(newSortOrder);
+    }
+
+    private void applySortOrder(String newSortOrder) {
+        // 保存新的排序顺序
+        sortOrder = newSortOrder;
+        // 重新加载笔记列表
+        refreshNotesList();
+        // 保存排序偏好
+        saveSortPreference(sortOrder);
+    }
+
+    private void refreshNotesList() {
+        // 重新查询数据并更新列表
+        Cursor newCursor = managedQuery(getIntent().getData(), PROJECTION, null, null, sortOrder);
+        ((SimpleCursorAdapter) getListAdapter()).changeCursor(newCursor);
+    }
+
+    private void saveSortPreference(String sortOrder) {
+        SharedPreferences preferences = getSharedPreferences("NotePadPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString("SortOrder", sortOrder);
+        editor.apply();
+    }
+![img_5.png](img_5.png)
+![img_6.png](img_6.png)
+![img_7.png](img_7.png)
+![img_8.png](img_8.png)
+
+
+
+
+护眼模式：开启护眼模式，减少屏幕蓝光，保护视力。（只有菜单按钮，并未完全实现这个功能）
+![img_9.png](img_9.png)
+![img_10.png](img_10.png)
+
+
+
 快速访问菜单：通过菜单按钮，用户可以快速访问保存、撤销、复制和粘贴等操作。
 
 
